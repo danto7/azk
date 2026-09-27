@@ -43,7 +43,7 @@ func NewVault(tb testing.TB) *service.Service {
 	if err != nil {
 		tb.Fatal(err)
 	}
-	tb.Cleanup(func() { v.Close() })
+	tb.Cleanup(func() { _ = v.Close() })
 	return service.New(v, "test")
 }
 

@@ -1,0 +1,16 @@
+{{define "content"}}
+<section class="card narrow">
+  <h1>Unlock vault</h1>
+  <form method="post" action="/login">
+    <label>Passphrase
+      <input type="password" name="passphrase" autocomplete="current-password" autofocus required>
+    </label>
+    <button type="submit">Unlock</button>
+  </form>
+  {{if .Data.HasKeyVault}}
+  <form method="post" action="/login/keyvault" class="mt">
+    <button type="submit" class="secondary">Unlock with Azure Key Vault</button>
+  </form>
+  {{end}}
+</section>
+{{end}}

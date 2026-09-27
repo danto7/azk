@@ -1,0 +1,80 @@
+:root {
+  --bg: #f6f7f9; --card: #ffffff; --fg: #1a1d24; --muted: #6b7280; --line: #e3e6ea;
+  --accent: #2563eb; --accent-fg: #ffffff; --ok: #15803d; --warn: #b45309; --err: #b91c1c;
+  --chip: #eef1f5; --code: #f1f3f6; --radius: 8px;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #111318; --card: #1a1d24; --fg: #e6e8ec; --muted: #9aa1ad; --line: #2b3038;
+    --accent: #60a5fa; --accent-fg: #0b1220; --ok: #4ade80; --warn: #fbbf24; --err: #f87171;
+    --chip: #262b34; --code: #20242c;
+  }
+}
+* { box-sizing: border-box; }
+html { font: 15px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; background: var(--bg); color: var(--fg); }
+body { margin: 0; min-height: 100vh; display: flex; flex-direction: column; }
+a { color: var(--accent); text-decoration: none; }
+a:hover { text-decoration: underline; }
+code, pre { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 0.92em; }
+code { background: var(--code); padding: 1px 5px; border-radius: 4px; }
+.top { display: flex; align-items: center; gap: 1.5rem; padding: 0.6rem 1.25rem; background: var(--card); border-bottom: 1px solid var(--line); }
+.brand { font-weight: 700; font-size: 1.15rem; color: var(--fg); }
+.top nav { display: flex; gap: 1rem; flex: 1; }
+.top nav a { color: var(--muted); padding: 0.25rem 0; border-bottom: 2px solid transparent; }
+.top nav a.active, .top nav a:hover { color: var(--fg); border-color: var(--accent); text-decoration: none; }
+main { flex: 1; width: min(1100px, 100%); margin: 0 auto; padding: 1.25rem; }
+footer { padding: 0.75rem 1.25rem; color: var(--muted); font-size: 0.85rem; border-top: 1px solid var(--line); }
+h1 { font-size: 1.5rem; margin: 0 0 1rem; display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap; }
+h2 { font-size: 1.05rem; margin: 0 0 0.75rem; }
+h3 { font-size: 1rem; margin: 1rem 0 0.5rem; }
+.card { background: var(--card); border: 1px solid var(--line); border-radius: var(--radius); padding: 1rem 1.25rem; margin-bottom: 1rem; }
+.card.narrow { max-width: 420px; margin: 4rem auto; }
+.cols { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+@media (max-width: 800px) { .cols { grid-template-columns: 1fr; } }
+.tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 1rem; margin-bottom: 1rem; }
+.tile { background: var(--card); border: 1px solid var(--line); border-radius: var(--radius); padding: 1rem; display: flex; flex-direction: column; color: var(--fg); }
+.tile:hover { border-color: var(--accent); text-decoration: none; }
+.tile .num { font-size: 1.8rem; font-weight: 600; }
+dl { display: grid; grid-template-columns: max-content 1fr; gap: 0.35rem 1rem; margin: 0 0 1rem; }
+dt { color: var(--muted); }
+dd { margin: 0; overflow-wrap: anywhere; }
+table { width: 100%; border-collapse: collapse; }
+th, td { text-align: left; padding: 0.5rem 0.6rem; border-bottom: 1px solid var(--line); vertical-align: top; }
+th { color: var(--muted); font-weight: 500; font-size: 0.85rem; }
+table.compact td, table.compact th { padding: 0.3rem 0.5rem; }
+tr.reveal-row td { padding: 0; border: 0; }
+.reveal:not(:empty) { padding: 0.5rem 0.6rem 0.75rem; }
+.muted { color: var(--muted); }
+.small { font-size: 0.85rem; }
+.err { color: var(--err); }
+.mt { margin-top: 0.75rem; }
+.chip { display: inline-block; background: var(--chip); border-radius: 999px; padding: 0.05rem 0.6rem; font-size: 0.8rem; white-space: nowrap; }
+.chip.ok { color: var(--ok); } .chip.warn { color: var(--warn); }
+.chip.op-push, .chip.op-pull { color: var(--accent); } .chip.op-conflict { color: var(--err); }
+.flash { padding: 0.6rem 0.9rem; border-radius: var(--radius); margin-bottom: 1rem; border: 1px solid; }
+.flash.ok { color: var(--ok); border-color: var(--ok); background: color-mix(in srgb, var(--ok) 8%, transparent); }
+.flash.err { color: var(--err); border-color: var(--err); background: color-mix(in srgb, var(--err) 8%, transparent); }
+label { display: block; margin-bottom: 0.75rem; font-size: 0.9rem; color: var(--muted); }
+label.check { display: inline-flex; align-items: center; gap: 0.35rem; margin: 0 0.5rem 0 0; }
+input:not([type=checkbox]), select, textarea { display: block; width: 100%; margin-top: 0.25rem; padding: 0.45rem 0.6rem; border: 1px solid var(--line); border-radius: 6px; background: var(--bg); color: var(--fg); font: inherit; }
+input[type=file] { padding: 0.3rem; }
+textarea { font-family: ui-monospace, Menlo, monospace; }
+.row { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 0.75rem; }
+button { font: inherit; padding: 0.45rem 0.9rem; border-radius: 6px; border: 1px solid var(--accent); background: var(--accent); color: var(--accent-fg); cursor: pointer; }
+button.secondary { background: transparent; color: var(--accent); }
+button.danger { border-color: var(--err); color: var(--err); background: transparent; }
+button.small, a.small { padding: 0.2rem 0.55rem; font-size: 0.82rem; }
+button:hover { filter: brightness(1.08); }
+form.inline { display: inline-flex; align-items: center; gap: 0.5rem; margin-right: 0.5rem; }
+form.inline label { margin: 0; }
+form.filters { display: flex; gap: 0.5rem; flex-wrap: wrap; align-items: center; margin-bottom: 1rem; }
+form.filters input, form.filters select { width: auto; margin: 0; }
+.tabs { display: flex; gap: 0.25rem; margin-bottom: 1rem; border-bottom: 1px solid var(--line); }
+.tabs a { padding: 0.5rem 0.9rem; color: var(--muted); border-bottom: 2px solid transparent; margin-bottom: -1px; }
+.tabs a.active { color: var(--fg); border-color: var(--accent); }
+details { margin-bottom: 0.75rem; } summary { cursor: pointer; color: var(--muted); margin-bottom: 0.5rem; }
+td.actions { white-space: nowrap; }
+td.actions form { margin-right: 0.25rem; }
+.secret { display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap; }
+.secret pre.value { margin: 0; background: var(--code); padding: 0.4rem 0.6rem; border-radius: 6px; max-width: 100%; overflow: auto; white-space: pre-wrap; }
+.htmx-indicator { display: none; } .htmx-request .htmx-indicator, .htmx-request.htmx-indicator { display: inline; }

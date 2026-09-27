@@ -222,11 +222,16 @@ func (g *globals) open(ctx context.Context, unlock bool) (*service.Service, erro
 	}
 	if unlock {
 		if err := g.unlock(ctx, v); err != nil {
-			v.Close()
+			_ = v.Close()
 			return nil, err
 		}
 	}
 	return service.New(v, "cli"), nil
+}
+
+// serviceWithActor re-labels the audit actor for a service.
+func serviceWithActor(s *service.Service, actor string) *service.Service {
+	return service.New(s.Vault(), actor)
 }
 
 // --- output helpers ---
@@ -243,7 +248,7 @@ func (g *globals) table(header []string, rows [][]string) {
 	for _, r := range rows {
 		fmt.Fprintln(w, strings.Join(r, "\t"))
 	}
-	w.Flush()
+	_ = w.Flush()
 }
 
 func fmtTime(t time.Time) string {

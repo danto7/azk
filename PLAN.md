@@ -168,3 +168,21 @@ Rough sizing: M0 1 day, M1 3–4 days, M2 2–3 days, M3 3–4 days, M4 4–5 da
 3. Are certificates (Key Vault `certificates/`) needed in v1? Floci supports self‑signed issuance, so tests are cheap, but the local model gets larger.
 4. Should the web UI ever be reachable from another machine (needs TLS + real auth), or is loopback‑only a hard rule?
 5. Passphrase‑less unlock on trusted machines (OS keychain / TPM) — v1 or later?
+
+## 7. Status and deviations (updated as milestones land)
+
+All milestones M0 to M4 are implemented. Deviations from the plan above:
+
+- `RSA1_5` is not supported; Go 1.26 deprecates PKCS#1 v1.5 encryption for
+  good reason.
+- Private export uses `--reveal-private` rather than the longer flag proposed.
+- `azk serve --listen` on a non-loopback address additionally requires
+  `--allow-remote`; the server is served without TLS and says so.
+- Unlock mode is a global `--unlock auto|passphrase|keyvault` (`AZK_UNLOCK`).
+- The Go SDK cannot send credentials over plain HTTP, so the emulator is
+  reached through an https client URL and a transport that downgrades the
+  scheme on the wire (the same trick floci documents for other SDKs).
+- Sync logic is unit tested against an in-memory fake Key Vault
+  (`internal/remote/keyvault/kvtest`) in addition to floci, so it runs
+  without Docker. The floci suite runs the same scenarios.
+- The agent daemon and OS keychain unlock from M5 are not started.

@@ -115,7 +115,7 @@ func (downgradeTransport) Do(req *http.Request) (*http.Response, error) {
 	if r.URL.Scheme == "https" {
 		r.URL.Scheme = "http"
 	}
-	return http.DefaultClient.Do(r)
+	return http.DefaultClient.Do(r) //nolint:gosec // the emulator URL is user configuration by design
 }
 
 // Open builds a client with the default credential.

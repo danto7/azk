@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>azk · {{.Title}}</title>
+<link rel="stylesheet" href="/static/app.css">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Ccircle cx='8' cy='8' r='7' fill='%232563eb'/%3E%3C/svg%3E">
+</head>
+<body hx-headers='{"X-CSRF-Token": "{{.CSRF}}"}'>
+<header class="top">
+  <a class="brand" href="/">azk</a>
+  {{if not .Locked}}
+  <nav>
+    <a href="/" {{if eq .Path "/"}}class="active"{{end}}>Dashboard</a>
+    <a href="/items" {{if eq .Path "/items"}}class="active"{{end}}>Items</a>
+    <a href="/items/new" {{if eq .Path "/items/new"}}class="active"{{end}}>New</a>
+    <a href="/remotes" {{if eq .Path "/remotes"}}class="active"{{end}}>Remotes</a>
+    <a href="/audit" {{if eq .Path "/audit"}}class="active"{{end}}>Audit</a>
+  </nav>
+  <form method="post" action="/lock" class="inline">
+    <input type="hidden" name="csrf" value="{{.CSRF}}">
+    <button class="secondary" type="submit">Lock</button>
+  </form>
+  {{end}}
+</header>
+<main>
+  {{if .Flash}}<div class="flash ok" role="status">{{.Flash}}</div>{{end}}
+  {{if .Error}}<div class="flash err" role="alert">{{.Error}}</div>{{end}}
+  {{template "content" .}}
+</main>
+<footer><span>{{.Vault}}</span></footer>
+<script src="/static/htmx.min.js"></script>
+<script src="/static/app.js"></script>
+</body>
+</html>
