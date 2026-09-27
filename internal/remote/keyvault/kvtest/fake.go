@@ -171,11 +171,16 @@ func (v *fakeVersion) apply(a *attrs) {
 	v.nbf, v.exp = fromUnix(a.NBF), fromUnix(a.Exp)
 }
 
+// IDHost is the host the fake puts into object ids. Like floci-az, it is a
+// real-looking Azure host rather than the address the server listens on,
+// so callers cannot assume ids share the vault URL's host.
+const IDHost = "https://fakeaccount.vault.azure.net"
+
 func (f *Fake) kid(name, version string) string {
-	return f.Server.URL + "/keys/" + name + "/" + version
+	return IDHost + "/keys/" + name + "/" + version
 }
 func (f *Fake) sid(name, version string) string {
-	return f.Server.URL + "/secrets/" + name + "/" + version
+	return IDHost + "/secrets/" + name + "/" + version
 }
 
 func (f *Fake) keyBundle(name string, v *fakeVersion) map[string]any {
@@ -193,7 +198,7 @@ func (f *Fake) handleKeys(w http.ResponseWriter, r *http.Request, p []string) {
 		var items []map[string]any
 		for name, o := range f.keys {
 			last := o.versions[len(o.versions)-1]
-			items = append(items, map[string]any{"kid": f.Server.URL + "/keys/" + name, "attributes": last.attrs(), "tags": last.tags})
+			items = append(items, map[string]any{"kid": IDHost + "/keys/" + name, "attributes": last.attrs(), "tags": last.tags})
 		}
 		reply(w, map[string]any{"value": items, "nextLink": nil})
 		return
@@ -381,7 +386,7 @@ func (f *Fake) handleSecrets(w http.ResponseWriter, r *http.Request, p []string)
 		for name, o := range f.secrets {
 			last := o.versions[len(o.versions)-1]
 			b := f.secretBundle(name, last, false)
-			b["id"] = f.Server.URL + "/secrets/" + name
+			b["id"] = IDHost + "/secrets/" + name
 			items = append(items, b)
 		}
 		reply(w, map[string]any{"value": items, "nextLink": nil})
