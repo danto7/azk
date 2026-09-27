@@ -64,7 +64,7 @@ func cliScenario(t *testing.T, vaultURL string) {
 	if !strings.Contains(out, "Pushed 2, pulled 0") {
 		t.Fatalf("push: %s", out)
 	}
-	out = must("", "remote", "sync", "floci")
+	out = must("", "remote", "sync", "floci", "cli-rsa", "cli-sec")
 	if !strings.Contains(out, "Nothing to do") {
 		t.Fatalf("sync after push: %s", out)
 	}

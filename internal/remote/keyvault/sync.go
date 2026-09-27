@@ -4,7 +4,9 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net/url"
 	"sort"
+	"strings"
 	"time"
 	"unicode/utf8"
 
@@ -74,7 +76,48 @@ func NewSyncer(svc *service.Service, client *Client, remote store.Remote) *Synce
 
 type remoteObject struct {
 	kind     string // "key" or "secret"
+	id       string // object id as the remote reports it, without version
 	versions []remoteVersion
+}
+
+// inventory is the remote's objects by name plus the host the remote uses
+// in its ids (emulators may report ids under a different host than the
+// one they are reached at).
+type inventory struct {
+	objects map[string]*remoteObject
+	host    string
+}
+
+func (inv *inventory) note(id string) {
+	if inv.host != "" {
+		return
+	}
+	if u, err := url.Parse(id); err == nil {
+		inv.host = strings.ToLower(u.Host)
+	}
+}
+
+// linkedHere reports whether an item's recorded remote id belongs to this
+// remote. An item without a remote id is unlinked and counts as here.
+func (s *Syncer) linkedHere(it *store.Item, inv *inventory) bool {
+	if it.RemoteID == "" {
+		return true
+	}
+	if robj := inv.objects[it.Name]; robj != nil {
+		return SameObject(it.RemoteID, robj.id)
+	}
+	u, err := url.Parse(it.RemoteID)
+	if err != nil {
+		return false
+	}
+	h := strings.ToLower(u.Host)
+	if inv.host != "" && h == inv.host {
+		return true
+	}
+	if vu, err := url.Parse(s.client.VaultURL()); err == nil && strings.EqualFold(vu.Host, h) {
+		return true
+	}
+	return false
 }
 
 type remoteVersion struct {
@@ -83,8 +126,8 @@ type remoteVersion struct {
 }
 
 // inventory lists remote keys and secrets with their versions.
-func (s *Syncer) inventory(ctx context.Context) (map[string]*remoteObject, error) {
-	inv := map[string]*remoteObject{}
+func (s *Syncer) inventory(ctx context.Context) (*inventory, error) {
+	inv := &inventory{objects: map[string]*remoteObject{}}
 	kp := s.client.keys.NewListKeyPropertiesPager(nil)
 	for kp.More() {
 		page, err := kp.NextPage(ctx)
@@ -93,7 +136,8 @@ func (s *Syncer) inventory(ctx context.Context) (map[string]*remoteObject, error
 		}
 		for _, k := range page.Value {
 			name := k.KID.Name()
-			obj := &remoteObject{kind: "key"}
+			obj := &remoteObject{kind: "key", id: baseID(string(*k.KID))}
+			inv.note(obj.id)
 			vp := s.client.keys.NewListKeyPropertiesVersionsPager(name, nil)
 			for vp.More() {
 				vpage, err := vp.NextPage(ctx)
@@ -108,7 +152,7 @@ func (s *Syncer) inventory(ctx context.Context) (map[string]*remoteObject, error
 					obj.versions = append(obj.versions, rv)
 				}
 			}
-			inv[name] = obj
+			inv.objects[name] = obj
 		}
 	}
 	sp := s.client.secrets.NewListSecretPropertiesPager(nil)
@@ -119,10 +163,11 @@ func (s *Syncer) inventory(ctx context.Context) (map[string]*remoteObject, error
 		}
 		for _, sec := range page.Value {
 			name := sec.ID.Name()
-			if _, dup := inv[name]; dup {
+			if _, dup := inv.objects[name]; dup {
 				return nil, fmt.Errorf("remote has both a key and a secret named %s", name)
 			}
-			obj := &remoteObject{kind: "secret"}
+			obj := &remoteObject{kind: "secret", id: baseID(string(*sec.ID))}
+			inv.note(obj.id)
 			vp := s.client.secrets.NewListSecretPropertiesVersionsPager(name, nil)
 			for vp.More() {
 				vpage, err := vp.NextPage(ctx)
@@ -137,10 +182,10 @@ func (s *Syncer) inventory(ctx context.Context) (map[string]*remoteObject, error
 					obj.versions = append(obj.versions, rv)
 				}
 			}
-			inv[name] = obj
+			inv.objects[name] = obj
 		}
 	}
-	for _, obj := range inv {
+	for _, obj := range inv.objects {
 		sort.SliceStable(obj.versions, func(i, j int) bool { return obj.versions[i].created.Before(obj.versions[j].created) })
 	}
 	return inv, nil
@@ -177,11 +222,11 @@ func (s *Syncer) Plan(ctx context.Context, push, pull bool, names []string) (*Pl
 		if !selected(it.Name) {
 			continue
 		}
-		if it.RemoteID != "" && !SameObject(it.RemoteID, s.objectID(localKind(it), it.Name)) {
+		if !s.linkedHere(it, inv) {
 			plan.Actions = append(plan.Actions, Action{Op: OpSkip, Kind: it.Kind, Name: it.Name, Reason: "linked to a different remote"})
 			continue
 		}
-		robj := inv[it.Name]
+		robj := inv.objects[it.Name]
 		if robj != nil && robj.kind != localKind(it) {
 			plan.Actions = append(plan.Actions, Action{Op: OpConflict, Kind: it.Kind, Name: it.Name, Reason: fmt.Sprintf("local %s but remote %s", localKind(it), robj.kind)})
 			continue
@@ -195,7 +240,7 @@ func (s *Syncer) Plan(ctx context.Context, push, pull bool, names []string) (*Pl
 		}
 	}
 	if pull {
-		for name, robj := range inv {
+		for name, robj := range inv.objects {
 			if !selected(name) {
 				continue
 			}
@@ -203,7 +248,7 @@ func (s *Syncer) Plan(ctx context.Context, push, pull bool, names []string) (*Pl
 			if it != nil && robj.kind != localKind(it) {
 				continue // conflict already recorded
 			}
-			if it != nil && it.RemoteID != "" && !SameObject(it.RemoteID, s.objectID(robj.kind, name)) {
+			if it != nil && !s.linkedHere(it, inv) {
 				continue // linked elsewhere, already recorded
 			}
 			known := map[string]bool{}
@@ -270,13 +315,6 @@ func (s *Syncer) remoteKind(ctx context.Context, name string, robj *remoteObject
 		return "", err
 	}
 	return string(jwk.Kind()), nil
-}
-
-func (s *Syncer) objectID(kind, name string) string {
-	if kind == "secret" {
-		return s.client.VaultURL() + "/secrets/" + name
-	}
-	return s.client.VaultURL() + "/keys/" + name
 }
 
 func (s *Syncer) planPush(ctx context.Context, it *store.Item) ([]Action, error) {
