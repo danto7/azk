@@ -1,0 +1,86 @@
+exec azk init
+exec azk key generate rsa --type rsa --bits 2048
+exec azk key generate ec --type ec
+exec azk key generate ed --type ed25519
+exec azk key generate aes --type oct --bits 256
+
+# Sign and verify with every key type, default and explicit algorithms.
+exec azk sign --key rsa --in msg.txt -o rsa.sig
+exec azk verify --key rsa --in msg.txt --signature @rsa.sig
+stdout '^valid$'
+exec azk sign --key rsa --alg PS512 --in msg.txt --raw -o rsa.raw
+exec azk verify --key rsa --alg PS512 --in msg.txt --signature @rsa.raw --raw-signature
+! exec azk verify --key rsa --in msg.txt --signature @rsa.raw --raw-signature
+stdout '^invalid$'
+! exec azk verify --key rsa --in other.txt --signature @rsa.sig
+stdout invalid
+exec azk --json sign --key ec --in msg.txt
+stdout '"algorithm": "ES256"'
+exec azk sign --key ec --in msg.txt -o ec.sig
+exec azk verify --key ec --in msg.txt --signature @ec.sig
+exec azk sign --key ed --in msg.txt -o ed.sig
+exec azk verify --key ed --in msg.txt --signature @ed.sig
+stdout valid
+! exec azk sign --key aes --in msg.txt
+stderr 'cannot sign'
+! exec azk sign --key ec --alg RS256 --in msg.txt
+stderr 'not supported'
+
+# Encrypt/decrypt through the JSON envelope, with AAD for AES.
+exec azk encrypt --key aes --aad ctx --in msg.txt -o aes.json
+grep '"algorithm": "A256GCM"' aes.json
+grep '"iv":' aes.json
+exec azk decrypt --in aes.json
+cmp stdout msg.txt
+! exec azk encrypt --key aes --in msg.txt --raw
+stderr 'iv and tag'
+exec azk encrypt --key rsa --in msg.txt -o rsa.json
+grep '"algorithm": "RSA-OAEP-256"' rsa.json
+exec azk decrypt --in rsa.json
+cmp stdout msg.txt
+exec azk encrypt --key rsa --alg RSA1_5 --in msg.txt --raw -o rsa.bin
+exec azk decrypt --key rsa --alg RSA1_5 --raw --in rsa.bin
+cmp stdout msg.txt
+! exec azk decrypt --in msg.txt
+stderr 'not an encrypt envelope'
+! exec azk encrypt --key ed --in msg.txt
+stderr 'cannot encrypt'
+
+# Wrap/unwrap: AES-KW needs 8-byte multiples, RSA takes anything small.
+exec azk wrap --key aes --in key32.b64 -o w.b64
+exec azk unwrap --key aes --in w.b64
+cmp stdout key32.b64
+exec azk wrap --key rsa --raw-in --in msg.txt --raw -o w.bin
+exec azk unwrap --key rsa --raw-in --in w.bin --raw
+cmp stdout msg.txt
+! exec azk wrap --key aes --raw-in --in msg.txt
+stderr 'multiple of 8'
+! exec azk unwrap --key aes --in msg.txt
+stderr 'not base64'
+
+# Versions: a signature is tied to the version that made it.
+exec azk key rotate ec
+exec azk verify --key ec --version 1 --in msg.txt --signature @ec.sig
+! exec azk verify --key ec --in msg.txt --signature @ec.sig
+stdout invalid
+exec azk key disable ec --version 2
+exec azk sign --key ec --in msg.txt
+! exec azk sign --key ec --version 2 --in msg.txt
+stderr 'disabled'
+
+# Expired and not-yet-valid versions are refused for private operations.
+exec azk key generate old --type ec --expires 2000-01-01
+! exec azk sign --key old --in msg.txt
+stderr 'expired'
+exec azk key generate future --type ec --not-before 2999-01-01
+! exec azk sign --key future --in msg.txt
+stderr 'not valid before'
+! exec azk key generate bad --type ec --expires soon
+stderr 'invalid time'
+
+-- msg.txt --
+the quick brown fox
+-- other.txt --
+the quick brown cat
+-- key32.b64 --
+AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8=

@@ -1,0 +1,31 @@
+# A fresh vault can be created once, inspected, and refuses a wrong passphrase.
+! exec azk status
+stderr 'not an azk vault'
+
+exec azk init
+stdout 'Created vault'
+
+! exec azk init
+stderr 'already contains a vault'
+
+exec azk status
+stdout 'Format:   v1'
+stdout 'Slots:    1'
+stdout 'Items:    0'
+
+exec azk --json status
+stdout '"format_version": 1'
+
+env AZK_PASSPHRASE=wrong
+! exec azk key generate k
+stderr 'passphrase does not unlock'
+
+# Passphrase file wins over nothing; env is used when set.
+env AZK_PASSPHRASE=
+! exec azk key generate k
+stderr 'no passphrase'
+exec azk --passphrase-file=pass.txt key generate k --type ed25519
+stdout 'Kind:     ed25519'
+
+-- pass.txt --
+correct horse

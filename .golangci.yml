@@ -1,0 +1,26 @@
+version: "2"
+run:
+  build-tags:
+    - integration
+linters:
+  default: standard
+  enable:
+    - errorlint
+    - gosec
+    - misspell
+    - unconvert
+    - unparam
+  settings:
+    gosec:
+      excludes:
+        - G115 # integer conversions are bounds-checked where it matters
+        - G304 # file paths come from the user on purpose
+  exclusions:
+    rules:
+      - path: _test\.go
+        linters:
+          - gosec
+          - errcheck
+formatters:
+  enable:
+    - gofmt
