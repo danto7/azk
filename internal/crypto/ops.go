@@ -16,7 +16,8 @@ import (
 )
 
 // Algorithm names follow JOSE / Azure Key Vault so that an operation done
-// locally is interchangeable with one done in Key Vault.
+// locally is interchangeable with one done in Key Vault. RSA1_5 is left out
+// on purpose: PKCS#1 v1.5 encryption is padding-oracle prone.
 const (
 	AlgRS256 = "RS256"
 	AlgRS384 = "RS384"
@@ -29,7 +30,6 @@ const (
 	AlgES512 = "ES512"
 	AlgEdDSA = "EdDSA"
 
-	AlgRSA15      = "RSA1_5"
 	AlgRSAOAEP    = "RSA-OAEP"
 	AlgRSAOAEP256 = "RSA-OAEP-256"
 	AlgA128GCM    = "A128GCM"
@@ -64,7 +64,7 @@ func SignatureAlgorithms(j *JWK) []string {
 func EncryptionAlgorithms(j *JWK) []string {
 	switch j.Kty {
 	case "RSA":
-		return []string{AlgRSAOAEP256, AlgRSAOAEP, AlgRSA15}
+		return []string{AlgRSAOAEP256, AlgRSAOAEP}
 	case "oct":
 		switch len(j.K) {
 		case 16:
@@ -82,7 +82,7 @@ func EncryptionAlgorithms(j *JWK) []string {
 func WrapAlgorithms(j *JWK) []string {
 	switch j.Kty {
 	case "RSA":
-		return []string{AlgRSAOAEP256, AlgRSAOAEP, AlgRSA15}
+		return []string{AlgRSAOAEP256, AlgRSAOAEP}
 	case "oct":
 		switch len(j.K) {
 		case 16:
@@ -262,12 +262,7 @@ func Encrypt(j *JWK, alg string, plaintext, aad []byte) (*Ciphertext, error) {
 			return nil, err
 		}
 		rk := pk.(*rsa.PublicKey)
-		var ct []byte
-		if alg == AlgRSA15 {
-			ct, err = rsa.EncryptPKCS1v15(rand.Reader, rk, plaintext)
-		} else {
-			ct, err = rsa.EncryptOAEP(oaepHash(alg).New(), rand.Reader, rk, plaintext, nil)
-		}
+		ct, err := rsa.EncryptOAEP(oaepHash(alg).New(), rand.Reader, rk, plaintext, nil)
 		if err != nil {
 			return nil, err
 		}
@@ -304,9 +299,6 @@ func Decrypt(j *JWK, alg string, ct *Ciphertext, aad []byte) ([]byte, error) {
 			return nil, err
 		}
 		rk := sk.(*rsa.PrivateKey)
-		if alg == AlgRSA15 {
-			return rsa.DecryptPKCS1v15(rand.Reader, rk, ct.Ciphertext)
-		}
 		return rsa.DecryptOAEP(oaepHash(alg).New(), rand.Reader, rk, ct.Ciphertext, nil)
 	case "oct":
 		block, err := aes.NewCipher(j.K)

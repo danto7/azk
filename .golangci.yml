@@ -11,10 +11,21 @@ linters:
     - unconvert
     - unparam
   settings:
+    errcheck:
+      exclude-functions:
+        - fmt.Fprint
+        - fmt.Fprintf
+        - fmt.Fprintln
+        - (*text/tabwriter.Writer).Flush
+        - (*database/sql.Rows).Close
+        - (*os.File).Close
+        - (*github.com/danto7/azk/internal/store.Store).Close
+        - (*github.com/danto7/azk/internal/vault.Vault).Close
     gosec:
       excludes:
         - G115 # integer conversions are bounds-checked where it matters
         - G304 # file paths come from the user on purpose
+        - G703 # same: --in/--out/--from paths are user input by design
   exclusions:
     rules:
       - path: _test\.go

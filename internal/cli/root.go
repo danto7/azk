@@ -23,6 +23,7 @@ import (
 	"golang.org/x/term"
 
 	"github.com/danto7/azk/internal/crypto"
+	"github.com/danto7/azk/internal/remote/keyvault"
 	"github.com/danto7/azk/internal/service"
 	"github.com/danto7/azk/internal/vault"
 )
@@ -35,6 +36,7 @@ type globals struct {
 	vaultPath      string
 	json           bool
 	passphraseFile string
+	unlockMode     string
 	stdin          io.Reader
 	stdout, stderr io.Writer
 }
@@ -90,6 +92,7 @@ AZK_PASSPHRASE, or prompted on the terminal.`,
 	root.PersistentFlags().StringVar(&g.vaultPath, "vault", "", "vault file (default $AZK_VAULT or "+defaultVaultPath()+")")
 	root.PersistentFlags().BoolVar(&g.json, "json", false, "print machine readable JSON")
 	root.PersistentFlags().StringVar(&g.passphraseFile, "passphrase-file", "", "read the passphrase from this file (default $AZK_PASSPHRASE_FILE)")
+	root.PersistentFlags().StringVar(&g.unlockMode, "unlock", "", "how to unlock: passphrase, keyvault or auto (default $AZK_UNLOCK or auto)")
 
 	root.AddCommand(
 		newInitCmd(g), newStatusCmd(g), newKeyCmd(g), newSecretCmd(g),
@@ -132,11 +135,7 @@ func (g *globals) passphrase(confirm bool) ([]byte, error) {
 		file = os.Getenv("AZK_PASSPHRASE_FILE")
 	}
 	if file != "" {
-		b, err := os.ReadFile(file)
-		if err != nil {
-			return nil, fmt.Errorf("passphrase file: %w", err)
-		}
-		return bytes.TrimRight(b, "\r\n"), nil
+		return readPassphraseFile(file)
 	}
 	f, ok := g.stdin.(*os.File)
 	if !ok || !term.IsTerminal(int(f.Fd())) {
@@ -162,6 +161,59 @@ func (g *globals) passphrase(confirm bool) ([]byte, error) {
 	return p, nil
 }
 
+// hasPassphraseSource reports whether a passphrase can be obtained without
+// prompting.
+func (g *globals) hasPassphraseSource() bool {
+	return os.Getenv("AZK_PASSPHRASE") != "" || g.passphraseFile != "" || os.Getenv("AZK_PASSPHRASE_FILE") != ""
+}
+
+func (g *globals) isTerminal() bool {
+	f, ok := g.stdin.(*os.File)
+	return ok && term.IsTerminal(int(f.Fd()))
+}
+
+// unlock opens the DEK using the passphrase or a keyvault slot. In auto
+// mode a keyvault slot is used when no passphrase source is configured
+// and no terminal is available to prompt on.
+func (g *globals) unlock(ctx context.Context, v *vault.Vault) error {
+	mode := g.unlockMode
+	if mode == "" {
+		mode = os.Getenv("AZK_UNLOCK")
+	}
+	if mode == "" {
+		mode = "auto"
+	}
+	useKeyVault := false
+	switch mode {
+	case "passphrase":
+	case "keyvault":
+		useKeyVault = true
+	case "auto":
+		if !g.hasPassphraseSource() && !g.isTerminal() {
+			slots, err := v.Slots(ctx)
+			if err != nil {
+				return err
+			}
+			for _, s := range slots {
+				if s.Kind == vault.SlotKeyVault {
+					useKeyVault = true
+				}
+			}
+		}
+	default:
+		return fmt.Errorf("unknown unlock mode %q (want passphrase, keyvault or auto)", mode)
+	}
+	if useKeyVault {
+		return v.UnlockWith(ctx, keyvault.Unwrapper{})
+	}
+	p, err := g.passphrase(false)
+	if err != nil {
+		return err
+	}
+	defer crypto.Zero(p)
+	return v.Unlock(ctx, p)
+}
+
 // open opens the vault; unlock decides whether the DEK is needed.
 func (g *globals) open(ctx context.Context, unlock bool) (*service.Service, error) {
 	v, err := vault.Open(ctx, g.path())
@@ -169,14 +221,7 @@ func (g *globals) open(ctx context.Context, unlock bool) (*service.Service, erro
 		return nil, err
 	}
 	if unlock {
-		p, err := g.passphrase(false)
-		if err != nil {
-			v.Close()
-			return nil, err
-		}
-		err = v.Unlock(ctx, p)
-		crypto.Zero(p)
-		if err != nil {
+		if err := g.unlock(ctx, v); err != nil {
 			v.Close()
 			return nil, err
 		}
@@ -275,20 +320,20 @@ func (g *globals) readInput(path string) ([]byte, error) {
 }
 
 // writeOutput writes to a file, or stdout when path is "" or "-".
-func (g *globals) writeOutput(path string, data []byte, mode os.FileMode) error {
+func (g *globals) writeOutput(path string, data []byte) error {
 	if path == "" || path == "-" {
 		_, err := g.stdout.Write(data)
 		return err
 	}
-	return os.WriteFile(path, data, mode)
+	return os.WriteFile(path, data, 0o600)
 }
 
 // writeEncoded writes bytes as base64 (plus newline) unless raw.
 func (g *globals) writeEncoded(path string, data []byte, raw bool) error {
 	if raw {
-		return g.writeOutput(path, data, 0o600)
+		return g.writeOutput(path, data)
 	}
-	return g.writeOutput(path, []byte(base64.StdEncoding.EncodeToString(data)+"\n"), 0o600)
+	return g.writeOutput(path, []byte(base64.StdEncoding.EncodeToString(data)+"\n"))
 }
 
 // decodeMaybeBase64 accepts raw bytes or base64 text, deciding by flag.

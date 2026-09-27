@@ -207,7 +207,7 @@ and the export is recorded in the audit log.`,
 			if err != nil {
 				return err
 			}
-			return g.writeOutput(out, data, 0o600)
+			return g.writeOutput(out, data)
 		},
 	}
 	cmd.Flags().StringVar(&format, "format", "pem", "output format: pem, jwk, raw")
@@ -380,7 +380,7 @@ func newDeleteCmd(g *globals, what string) *cobra.Command {
 func newRecoverCmd(g *globals, what string) *cobra.Command {
 	return &cobra.Command{
 		Use:   "recover NAME",
-		Short: "Undo a soft delete",
+		Short: "Undo a soft delete of a " + what,
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			s, err := g.open(cmd.Context(), false)
@@ -536,7 +536,7 @@ func newSecretGetCmd(g *globals) *cobra.Command {
 			if g.json {
 				return g.printJSON(map[string]any{"name": args[0], "seq": v.Seq, "version_id": v.ID, "value": string(m.Value), "content_type": m.ContentType})
 			}
-			return g.writeOutput(out, m.Value, 0o600)
+			return g.writeOutput(out, m.Value)
 		},
 	}
 	cmd.Flags().IntVar(&seq, "version", 0, "version number (default latest enabled)")

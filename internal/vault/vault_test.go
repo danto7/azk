@@ -3,6 +3,7 @@ package vault
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"path/filepath"
 	"testing"
 
@@ -36,10 +37,10 @@ func TestCreateUnlockLock(t *testing.T) {
 	if !v.IsLocked() {
 		t.Fatal("opened vault should be locked")
 	}
-	if _, err := v.Open(ct, []byte("aad")); err != ErrLocked {
+	if _, err := v.Open(ct, []byte("aad")); !errors.Is(err, ErrLocked) {
 		t.Fatalf("want ErrLocked got %v", err)
 	}
-	if err := v.Unlock(ctx, []byte("wrong")); err != ErrBadPassphrase {
+	if err := v.Unlock(ctx, []byte("wrong")); !errors.Is(err, ErrBadPassphrase) {
 		t.Fatalf("want ErrBadPassphrase got %v", err)
 	}
 	if err := v.Unlock(ctx, []byte("pw")); err != nil {
@@ -115,7 +116,7 @@ func TestSlots(t *testing.T) {
 		t.Fatal(err)
 	}
 	slots, _ = v.Slots(ctx)
-	if err := v.RemoveSlot(ctx, slots[0].ID); err != ErrLastSlot {
+	if err := v.RemoveSlot(ctx, slots[0].ID); !errors.Is(err, ErrLastSlot) {
 		t.Fatalf("want ErrLastSlot got %v", err)
 	}
 }

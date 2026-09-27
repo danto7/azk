@@ -154,7 +154,7 @@ func newEncryptCmd(g *globals) *cobra.Command {
 				if len(res.IV) > 0 {
 					return errors.New("--raw is only available for RSA algorithms; AES-GCM needs iv and tag")
 				}
-				return g.writeOutput(f.out, res.Result, 0o600)
+				return g.writeOutput(f.out, res.Result)
 			}
 			env := envelope{Key: res.Name, Seq: res.Seq, VersionID: res.VersionID, Algorithm: res.Algorithm,
 				Ciphertext: base64.StdEncoding.EncodeToString(res.Result)}
@@ -166,10 +166,10 @@ func newEncryptCmd(g *globals) *cobra.Command {
 				env.AAD = aad
 			}
 			data, _ := json.MarshalIndent(env, "", "  ")
-			return g.writeOutput(f.out, append(data, '\n'), 0o600)
+			return g.writeOutput(f.out, append(data, '\n'))
 		},
 	}
-	f.bind(cmd, "algorithm: RSA-OAEP-256, RSA-OAEP, RSA1_5, A128GCM, A192GCM, A256GCM (default by key)")
+	f.bind(cmd, "algorithm: RSA-OAEP-256, RSA-OAEP, A128GCM, A192GCM, A256GCM (default by key)")
 	cmd.Flags().StringVar(&aad, "aad", "", "additional authenticated data (AES-GCM only)")
 	cmd.Flags().BoolVar(&f.raw, "raw", false, "write raw ciphertext (RSA only)")
 	return cmd
@@ -232,7 +232,7 @@ func newDecryptCmd(g *globals) *cobra.Command {
 			if err != nil {
 				return err
 			}
-			return g.writeOutput(f.out, pt, 0o600)
+			return g.writeOutput(f.out, pt)
 		},
 	}
 	cmd.Flags().StringVarP(&f.key, "key", "k", "", "key name (default from envelope)")
@@ -274,7 +274,7 @@ func newWrapCmd(g *globals) *cobra.Command {
 			return g.writeEncoded(f.out, res.Result, f.raw)
 		},
 	}
-	f.bind(cmd, "algorithm: RSA-OAEP-256, RSA-OAEP, RSA1_5, A128KW, A192KW, A256KW (default by key)")
+	f.bind(cmd, "algorithm: RSA-OAEP-256, RSA-OAEP, A128KW, A192KW, A256KW (default by key)")
 	cmd.Flags().BoolVar(&f.rawI, "raw-in", false, "input is raw bytes rather than base64")
 	cmd.Flags().BoolVar(&f.raw, "raw", false, "write raw output instead of base64")
 	return cmd

@@ -307,18 +307,16 @@ func FromPrivateKey(k crypto.PrivateKey) (*JWK, error) {
 			QI:  k.Precomputed.Qinv.Bytes(),
 		}, nil
 	case *ecdsa.PrivateKey:
-		name := curveName(k.Curve)
-		if name == "" {
-			return nil, errors.New("unsupported EC curve")
+		pub, err := FromPublicKey(&k.PublicKey)
+		if err != nil {
+			return nil, err
 		}
-		size := (k.Curve.Params().BitSize + 7) / 8
-		return &JWK{
-			Kty: "EC",
-			Crv: name,
-			X:   k.X.FillBytes(make([]byte, size)),
-			Y:   k.Y.FillBytes(make([]byte, size)),
-			D:   k.D.FillBytes(make([]byte, size)),
-		}, nil
+		d, err := k.Bytes()
+		if err != nil {
+			return nil, err
+		}
+		pub.D = d
+		return pub, nil
 	case ed25519.PrivateKey:
 		return &JWK{
 			Kty: "OKP",
@@ -340,8 +338,12 @@ func FromPublicKey(k crypto.PublicKey) (*JWK, error) {
 		if name == "" {
 			return nil, errors.New("unsupported EC curve")
 		}
-		size := (k.Curve.Params().BitSize + 7) / 8
-		return &JWK{Kty: "EC", Crv: name, X: k.X.FillBytes(make([]byte, size)), Y: k.Y.FillBytes(make([]byte, size))}, nil
+		raw, err := k.Bytes() // 0x04 || X || Y
+		if err != nil {
+			return nil, err
+		}
+		size := (len(raw) - 1) / 2
+		return &JWK{Kty: "EC", Crv: name, X: clone(raw[1 : 1+size]), Y: clone(raw[1+size:])}, nil
 	case ed25519.PublicKey:
 		return &JWK{Kty: "OKP", Crv: "Ed25519", X: clone(k)}, nil
 	}
@@ -378,12 +380,16 @@ func (j *JWK) PrivateKey() (crypto.PrivateKey, error) {
 		if err != nil {
 			return nil, err
 		}
-		k := &ecdsa.PrivateKey{
-			PublicKey: ecdsa.PublicKey{Curve: curve, X: new(big.Int).SetBytes(j.X), Y: new(big.Int).SetBytes(j.Y)},
-			D:         new(big.Int).SetBytes(j.D),
+		k, err := ecdsa.ParseRawPrivateKey(curve, j.D)
+		if err != nil {
+			return nil, fmt.Errorf("invalid ec private key: %w", err)
 		}
-		if !curve.IsOnCurve(k.X, k.Y) {
-			return nil, errors.New("ec public point is not on the curve")
+		pub, err := j.PublicKey()
+		if err != nil {
+			return nil, err
+		}
+		if !k.PublicKey.Equal(pub) {
+			return nil, errors.New("ec public point does not match the private key")
 		}
 		return k, nil
 	case "OKP":
@@ -412,9 +418,14 @@ func (j *JWK) PublicKey() (crypto.PublicKey, error) {
 		if err != nil {
 			return nil, err
 		}
-		k := &ecdsa.PublicKey{Curve: curve, X: new(big.Int).SetBytes(j.X), Y: new(big.Int).SetBytes(j.Y)}
-		if !curve.IsOnCurve(k.X, k.Y) {
-			return nil, errors.New("ec public point is not on the curve")
+		size := (curve.Params().BitSize + 7) / 8
+		if len(j.X) != size || len(j.Y) != size {
+			return nil, errors.New("ec coordinate length does not match the curve")
+		}
+		raw := append(append([]byte{4}, j.X...), j.Y...)
+		k, err := ecdsa.ParseUncompressedPublicKey(curve, raw)
+		if err != nil {
+			return nil, fmt.Errorf("invalid ec public key: %w", err)
 		}
 		return k, nil
 	case "OKP":

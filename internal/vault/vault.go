@@ -78,17 +78,17 @@ func Create(ctx context.Context, path string, passphrase []byte, opts CreateOpti
 		return nil, err
 	}
 	if _, err := st.GetMeta(ctx, metaFormatVersion); err == nil {
-		st.Close()
+		_ = st.Close()
 		return nil, fmt.Errorf("%s already contains a vault", path)
 	}
 	dek, err := crypto.RandomBytes(crypto.KeySize)
 	if err != nil {
-		st.Close()
+		_ = st.Close()
 		return nil, err
 	}
 	dekID, err := randomID()
 	if err != nil {
-		st.Close()
+		_ = st.Close()
 		return nil, err
 	}
 	v := &Vault{path: path, store: st, dek: dek}
@@ -107,7 +107,7 @@ func Create(ctx context.Context, path string, passphrase []byte, opts CreateOpti
 	})
 	if err != nil {
 		v.Lock()
-		st.Close()
+		_ = st.Close()
 		return nil, err
 	}
 	return v, nil
@@ -121,7 +121,7 @@ func Open(ctx context.Context, path string) (*Vault, error) {
 	}
 	raw, err := st.GetMeta(ctx, metaFormatVersion)
 	if err != nil {
-		st.Close()
+		_ = st.Close()
 		if errors.Is(err, store.ErrNotFound) {
 			return nil, fmt.Errorf("%s is not an azk vault (run `azk init`)", path)
 		}
@@ -129,7 +129,7 @@ func Open(ctx context.Context, path string) (*Vault, error) {
 	}
 	ver, err := strconv.Atoi(string(raw))
 	if err != nil || ver != FormatVersion {
-		st.Close()
+		_ = st.Close()
 		return nil, fmt.Errorf("vault format version %s is not supported by this build (want %d)", raw, FormatVersion)
 	}
 	return &Vault{path: path, store: st}, nil

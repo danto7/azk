@@ -10,9 +10,9 @@ import (
 )
 
 func TestMain(m *testing.M) {
-	os.Exit(testscript.RunMain(m, map[string]func() int{
-		"azk": cli.Main,
-	}))
+	testscript.Main(m, map[string]func(){
+		"azk": func() { os.Exit(cli.Main()) },
+	})
 }
 
 func TestScripts(t *testing.T) {

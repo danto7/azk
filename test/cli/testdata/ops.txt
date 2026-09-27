@@ -38,8 +38,8 @@ exec azk encrypt --key rsa --in msg.txt -o rsa.json
 grep '"algorithm": "RSA-OAEP-256"' rsa.json
 exec azk decrypt --in rsa.json
 cmp stdout msg.txt
-exec azk encrypt --key rsa --alg RSA1_5 --in msg.txt --raw -o rsa.bin
-exec azk decrypt --key rsa --alg RSA1_5 --raw --in rsa.bin
+exec azk encrypt --key rsa --alg RSA-OAEP --in msg.txt --raw -o rsa.bin
+exec azk decrypt --key rsa --alg RSA-OAEP --raw --in rsa.bin
 cmp stdout msg.txt
 ! exec azk decrypt --in msg.txt
 stderr 'not an encrypt envelope'
