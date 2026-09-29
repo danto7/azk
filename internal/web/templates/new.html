@@ -1,0 +1,57 @@
+{{define "content"}}
+<h1>New item</h1>
+<div class="tabs">
+  <a href="/items/new?tab=generate" {{if or (eq .Data.Tab "") (eq .Data.Tab "generate")}}class="active"{{end}}>Generate key</a>
+  <a href="/items/new?tab=import" {{if eq .Data.Tab "import"}}class="active"{{end}}>Import key</a>
+  <a href="/items/new?tab=secret" {{if eq .Data.Tab "secret"}}class="active"{{end}}>Secret</a>
+</div>
+{{if or (eq .Data.Tab "") (eq .Data.Tab "generate")}}
+<form method="post" action="/items/generate" class="card" id="generate">
+  <input type="hidden" name="csrf" value="{{.CSRF}}">
+  <label>Name <input name="name" required pattern="[a-zA-Z0-9-]{1,127}" title="letters, digits and dashes"></label>
+  <div class="row">
+    <label>Type
+      <select name="kind" id="kind">
+        <option value="rsa">RSA</option><option value="ec">EC (ECDSA)</option><option value="oct">Symmetric (AES)</option><option value="ed25519">Ed25519</option>
+      </select>
+    </label>
+    <label>Bits (RSA: 2048/3072/4096, AES: 128/192/256)
+      <input name="bits" type="number" placeholder="default">
+    </label>
+    <label>Curve (EC)
+      <select name="curve"><option value="">P-256</option><option>P-384</option><option>P-521</option></select>
+    </label>
+  </div>
+  {{template "attrs" .}}
+  <button type="submit">Generate</button>
+</form>
+{{else if eq .Data.Tab "import"}}
+<form method="post" action="/items/import" class="card" enctype="multipart/form-data">
+  <input type="hidden" name="csrf" value="{{.CSRF}}">
+  <label>Name <input name="name" required pattern="[a-zA-Z0-9-]{1,127}"></label>
+  <label>Key material (PEM or JWK) <textarea name="material" rows="8" spellcheck="false"></textarea></label>
+  <label>…or a file <input type="file" name="file"></label>
+  {{template "attrs" .}}
+  <button type="submit">Import</button>
+</form>
+{{else}}
+<form method="post" action="/items/secret" class="card">
+  <input type="hidden" name="csrf" value="{{.CSRF}}">
+  <label>Name <input name="name" required pattern="[a-zA-Z0-9-]{1,127}"></label>
+  <label>Value <textarea name="value" rows="4" spellcheck="false" required></textarea></label>
+  <label>Content type <input name="content_type" placeholder="text/plain"></label>
+  {{template "attrs" .}}
+  <button type="submit">Store secret</button>
+</form>
+{{end}}
+{{end}}
+{{define "attrs"}}
+<details>
+  <summary>Tags and validity</summary>
+  <label>Tags (one key=value per line) <textarea name="tags" rows="2"></textarea></label>
+  <div class="row">
+    <label>Not before <input name="not_before" type="datetime-local"></label>
+    <label>Expires <input name="expires" type="datetime-local"></label>
+  </div>
+</details>
+{{end}}

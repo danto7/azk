@@ -1,0 +1,90 @@
+{{define "content"}}
+<h1>{{.Data.Name}} <span class="chip kind-{{.Data.Kind}}">{{.Data.Kind}}</span>{{if .Data.DeletedAt}} <span class="chip warn">deleted</span>{{end}}</h1>
+<div class="cols">
+  <section class="card">
+    <h2>Details</h2>
+    <dl>
+      <dt>Created</dt><dd>{{time .Data.CreatedAt}}</dd>
+      <dt>Updated</dt><dd>{{time .Data.UpdatedAt}}</dd>
+      {{if .Data.DeletedAt}}<dt>Deleted</dt><dd>{{time .Data.DeletedAt}}</dd>{{end}}
+      {{if .Data.RemoteID}}<dt>Remote</dt><dd><code>{{.Data.RemoteID}}</code></dd>{{end}}
+      {{if .Data.SigAlgs}}<dt>Signs with</dt><dd>{{range .Data.SigAlgs}}<span class="chip">{{.}}</span> {{end}}</dd>{{end}}
+      {{if .Data.EncAlgs}}<dt>Encrypts with</dt><dd>{{range .Data.EncAlgs}}<span class="chip">{{.}}</span> {{end}}</dd>{{end}}
+    </dl>
+    <form method="post" action="/items/{{.Data.Name}}/tags">
+      <input type="hidden" name="csrf" value="{{.CSRF}}">
+      <label>Tags (key=value per line) <textarea name="tags" rows="2">{{.Data.Tags}}</textarea></label>
+      <button type="submit" class="secondary">Save tags</button>
+    </form>
+  </section>
+  <section class="card">
+    <h2>Actions</h2>
+    {{if .Data.DeletedAt}}
+      <form method="post" action="/items/{{.Data.Name}}/recover" class="inline"><input type="hidden" name="csrf" value="{{.CSRF}}"><button type="submit">Recover</button></form>
+      <form method="post" action="/items/{{.Data.Name}}/purge" class="inline" data-confirm="Permanently delete {{.Data.Name}}? This cannot be undone."><input type="hidden" name="csrf" value="{{.CSRF}}"><button type="submit" class="danger">Purge</button></form>
+    {{else}}
+      {{if .Data.IsSecret}}
+      <form method="post" action="/items/{{.Data.Name}}/secret">
+        <input type="hidden" name="csrf" value="{{.CSRF}}">
+        <label>New value <textarea name="value" rows="2" required spellcheck="false"></textarea></label>
+        <label>Content type <input name="content_type"></label>
+        <button type="submit">Store new version</button>
+      </form>
+      {{else}}
+      <form method="post" action="/items/{{.Data.Name}}/rotate" class="inline">
+        <input type="hidden" name="csrf" value="{{.CSRF}}">
+        <label class="check"><input type="checkbox" name="disable_old" value="1"> disable previous</label>
+        <button type="submit">Rotate</button>
+      </form>
+      {{end}}
+      <form method="post" action="/items/{{.Data.Name}}/delete" class="inline mt" data-confirm="Delete {{.Data.Name}}? It can be recovered until purged."><input type="hidden" name="csrf" value="{{.CSRF}}"><button type="submit" class="danger secondary">Delete</button></form>
+    {{end}}
+  </section>
+</div>
+<section class="card">
+  <h2>Versions</h2>
+  <table id="versions">
+    <thead><tr><th>#</th><th>ID</th><th>State</th><th>Created</th><th>Not before</th><th>Expires</th>{{if not .Data.IsSecret}}<th>Size</th><th>Thumbprint</th>{{end}}<th></th></tr></thead>
+    <tbody>
+    {{range .Data.Versions}}
+    <tr>
+      <td>{{.Seq}}</td>
+      <td><code title="{{.ID}}">{{short .ID}}</code>{{if .RemoteVersion}} <span class="chip" title="remote version {{.RemoteVersion}}">synced</span>{{end}}</td>
+      <td>{{if .Enabled}}<span class="chip ok">enabled</span>{{else}}<span class="chip warn">disabled</span>{{end}}{{if .PublicOnly}} <span class="chip">public-only</span>{{end}}</td>
+      <td class="muted">{{time .CreatedAt}}</td>
+      <td class="muted">{{opttime .NotBefore}}</td>
+      <td class="muted">{{opttime .Expires}}</td>
+      {{if not $.Data.IsSecret}}<td>{{.Size}}</td><td><code class="tp" title="{{.Thumbprint}}">{{short .Thumbprint}}</code></td>{{end}}
+      <td class="actions">
+        {{if $.Data.IsSecret}}
+          <form method="post" action="/items/{{$.Data.Name}}/reveal" class="inline" hx-post="/items/{{$.Data.Name}}/reveal" hx-target="#reveal-{{.Seq}}" hx-swap="innerHTML">
+            <input type="hidden" name="csrf" value="{{$.CSRF}}"><input type="hidden" name="seq" value="{{.Seq}}">
+            <button type="submit" class="secondary small">Reveal</button>
+          </form>
+        {{else if .PublicJWK}}
+          <a class="small" href="/items/{{$.Data.Name}}/versions/{{.Seq}}/public.pem">PEM</a>
+          <a class="small" href="/items/{{$.Data.Name}}/versions/{{.Seq}}/public.jwk">JWK</a>
+        {{end}}
+        {{if .Enabled}}
+          <form method="post" action="/items/{{$.Data.Name}}/versions/{{.Seq}}/disable" class="inline"><input type="hidden" name="csrf" value="{{$.CSRF}}"><button type="submit" class="secondary small">Disable</button></form>
+        {{else}}
+          <form method="post" action="/items/{{$.Data.Name}}/versions/{{.Seq}}/enable" class="inline"><input type="hidden" name="csrf" value="{{$.CSRF}}"><button type="submit" class="secondary small">Enable</button></form>
+        {{end}}
+      </td>
+    </tr>
+    {{if $.Data.IsSecret}}<tr class="reveal-row"><td colspan="8"><div id="reveal-{{.Seq}}" class="reveal"></div></td></tr>{{end}}
+    {{end}}
+    </tbody>
+  </table>
+  {{if not .Data.IsSecret}}<p class="muted">Private material is exported with the CLI: <code>azk key export {{.Data.Name}} --reveal-private</code></p>{{end}}
+</section>
+{{end}}
+{{define "reveal"}}
+{{if .Error}}<span class="err">{{.Error}}</span>{{else}}
+<div class="secret" data-expires="30">
+  <pre class="value">{{.Value}}</pre>
+  <span class="muted small">version {{.Seq}}{{if .ContentType}} · {{.ContentType}}{{end}} · hidden again in <span class="countdown">30</span>s</span>
+  <button type="button" class="secondary small copy">Copy</button>
+</div>
+{{end}}
+{{end}}

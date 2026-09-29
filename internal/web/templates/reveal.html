@@ -1,0 +1,15 @@
+{{define "content"}}
+<h1>{{.Data.Name}}</h1>
+<section class="card">
+  {{template "reveal" .Data}}
+  <p><a href="/items/{{.Data.Name}}">Back</a></p>
+</section>
+{{end}}
+{{define "reveal"}}
+{{if .Error}}<span class="err">{{.Error}}</span>{{else}}
+<div class="secret" data-expires="30">
+  <pre class="value">{{.Value}}</pre>
+  <span class="muted small">version {{.Seq}}{{if .ContentType}} · {{.ContentType}}{{end}}</span>
+</div>
+{{end}}
+{{end}}

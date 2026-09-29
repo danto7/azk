@@ -1,0 +1,29 @@
+{{define "content"}}
+<h1>Dashboard</h1>
+<div class="tiles">
+  <a class="tile" href="/items"><span class="num">{{.Data.Keys}}</span><span>keys</span></a>
+  <a class="tile" href="/items?kind=secret"><span class="num">{{.Data.Secrets}}</span><span>secrets</span></a>
+  <a class="tile" href="/items?deleted=1"><span class="num">{{.Data.Deleted}}</span><span>deleted</span></a>
+  <a class="tile" href="/remotes"><span class="num">{{len .Data.Remotes}}</span><span>remotes</span></a>
+</div>
+<div class="cols">
+  <section class="card">
+    <h2>Vault</h2>
+    <dl>
+      <dt>File</dt><dd><code>{{.Data.Info.Path}}</code></dd>
+      <dt>Format</dt><dd>v{{.Data.Info.FormatVersion}}</dd>
+      <dt>Created</dt><dd>{{time .Data.Info.CreatedAt}}</dd>
+      <dt>Unlock slots</dt><dd>{{range .Data.Slots}}<span class="chip">{{.Kind}}: {{.Label}}</span> {{end}}</dd>
+    </dl>
+  </section>
+  <section class="card">
+    <h2>Recent activity</h2>
+    {{if .Data.Audit}}
+    <table class="compact">
+      {{range .Data.Audit}}<tr><td class="muted">{{time .At}}</td><td>{{.Action}}</td><td><a href="/items/{{.Target}}">{{.Target}}</a></td></tr>{{end}}
+    </table>
+    <p><a href="/audit">Full audit log</a></p>
+    {{else}}<p class="muted">Nothing yet.</p>{{end}}
+  </section>
+</div>
+{{end}}

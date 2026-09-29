@@ -1,0 +1,31 @@
+{{define "content"}}
+<h1>Items</h1>
+<form method="get" action="/items" class="filters">
+  <input type="search" name="q" placeholder="name prefix" value="{{.Data.Query}}">
+  <select name="kind">
+    <option value="">all kinds</option>
+    {{range .Data.Kinds}}<option value="{{.}}" {{if eq . $.Data.Kind}}selected{{end}}>{{.}}</option>{{end}}
+  </select>
+  <input type="text" name="tag" placeholder="tag or tag=value" value="{{.Data.Tag}}">
+  <label class="check"><input type="checkbox" name="deleted" value="1" {{if .Data.Deleted}}checked{{end}}> deleted only</label>
+  <button type="submit" class="secondary">Filter</button>
+</form>
+{{if .Data.Items}}
+<table id="items">
+  <thead><tr><th>Name</th><th>Kind</th><th>Tags</th><th>Updated</th><th>Remote</th></tr></thead>
+  <tbody>
+  {{range .Data.Items}}
+  <tr>
+    <td><a href="/items/{{.Name}}">{{.Name}}</a></td>
+    <td><span class="chip kind-{{.Kind}}">{{.Kind}}</span>{{if .DeletedAt}} <span class="chip warn">deleted</span>{{end}}</td>
+    <td>{{range $k, $v := .Tags}}<span class="chip">{{$k}}={{$v}}</span> {{end}}</td>
+    <td class="muted">{{time .UpdatedAt}}</td>
+    <td class="muted">{{if .RemoteID}}linked{{else}}-{{end}}</td>
+  </tr>
+  {{end}}
+  </tbody>
+</table>
+{{else}}
+<p class="muted">No items match. <a href="/items/new">Create one</a>.</p>
+{{end}}
+{{end}}

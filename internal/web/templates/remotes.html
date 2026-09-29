@@ -1,0 +1,59 @@
+{{define "content"}}
+<h1>Remotes</h1>
+<div class="cols">
+  <section class="card">
+    <h2>Configured Key Vaults</h2>
+    {{if .Data.Remotes}}
+    <table id="remotes">
+      <thead><tr><th>Name</th><th>Vault URL</th><th>Last sync</th><th></th></tr></thead>
+      <tbody>
+      {{range .Data.Remotes}}
+      <tr>
+        <td>{{.Name}}</td>
+        <td><code>{{.VaultURL}}</code>{{if .InsecureHTTP}} <span class="chip warn">insecure http</span>{{end}}</td>
+        <td class="muted">{{opttime .LastSyncAt}}</td>
+        <td class="actions">
+          <form method="post" action="/remotes/{{.Name}}/run" class="inline" hx-post="/remotes/{{.Name}}/run" hx-target="#plan" hx-swap="innerHTML" hx-indicator="#plan-busy">
+            <input type="hidden" name="csrf" value="{{$.CSRF}}">
+            <select name="mode"><option value="sync">sync</option><option value="push">push</option><option value="pull">pull</option></select>
+            <label class="check"><input type="checkbox" name="dry_run" value="1" checked> dry run</label>
+            <button type="submit" class="secondary small">Run</button>
+          </form>
+          <form method="post" action="/remotes/{{.Name}}/remove" class="inline" data-confirm="Forget remote {{.Name}}? Local items are kept."><input type="hidden" name="csrf" value="{{$.CSRF}}"><button type="submit" class="danger secondary small">Remove</button></form>
+        </td>
+      </tr>
+      {{end}}
+      </tbody>
+    </table>
+    {{else}}<p class="muted">No remotes yet.</p>{{end}}
+    <span id="plan-busy" class="htmx-indicator muted">Talking to Key Vault…</span>
+    <div id="plan">{{template "plan" .Data}}</div>
+  </section>
+  <section class="card">
+    <h2>Add a Key Vault</h2>
+    <form method="post" action="/remotes">
+      <input type="hidden" name="csrf" value="{{.CSRF}}">
+      <label>Name <input name="name" required pattern="[a-zA-Z0-9-]{1,127}"></label>
+      <label>Vault URL <input name="vault_url" required placeholder="https://myvault.vault.azure.net"></label>
+      <label class="check"><input type="checkbox" name="insecure_http" value="1"> allow plain http (emulator)</label>
+      <button type="submit">Add</button>
+    </form>
+    <p class="muted small">Credentials come from the environment the server runs in (DefaultAzureCredential or AZK_AZURE_TOKEN).</p>
+  </section>
+</div>
+{{end}}
+{{define "plan"}}
+{{if .Error}}<div class="flash err">{{.Error}}</div>{{end}}
+{{if .Plan}}
+<h3>{{.Mode}} {{.Remote}}{{if .DryRun}} (dry run){{end}}</h3>
+{{if .Plan.Actions}}
+<table class="compact">
+  <thead><tr><th>Op</th><th>Kind</th><th>Name</th><th>Version</th><th>Reason</th></tr></thead>
+  <tbody>
+  {{range .Plan.Actions}}<tr><td><span class="chip op-{{.Op}}">{{.Op}}</span></td><td>{{.Kind}}</td><td>{{.Name}}</td><td>{{if .Seq}}v{{.Seq}}{{else}}{{short .RemoteVersion}}{{end}}</td><td class="muted">{{.Reason}}</td></tr>{{end}}
+  </tbody>
+</table>
+{{else}}<p class="muted">Nothing to do; local vault and remote are in sync.</p>{{end}}
+{{if .Result}}<p>Pushed {{.Result.Pushed}}, pulled {{.Result.Pulled}}.</p>{{end}}
+{{end}}
+{{end}}

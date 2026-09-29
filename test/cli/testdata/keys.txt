@@ -1,0 +1,121 @@
+exec azk init
+
+# Generate one of each type.
+exec azk key generate rsa1 --type rsa --bits 2048 --tag env=dev --tag team=core
+stdout 'Kind:     rsa'
+stdout 'env=dev,team=core'
+stdout '2048'
+exec azk key generate ec1 --type ec --curve P-384
+stdout 'P-384'
+exec azk key generate aes1 --type oct --bits 128
+exec azk key generate ed1 --type ed25519
+! exec azk key generate rsa1 --type rsa
+stderr 'already exists'
+! exec azk key generate 'bad name' --type rsa
+stderr 'invalid name'
+! exec azk key generate x --type rsa --bits 1024
+stderr 'unsupported RSA size'
+! exec azk key generate x --type secret
+stderr 'not a key'
+
+# List and filter.
+exec azk key list
+stdout 'aes1 +oct +active'
+stdout 'ec1 +ec +active'
+stdout 'rsa1 +rsa'
+exec azk key list --type ec
+! stdout rsa1
+stdout ec1
+exec azk key list --tag env=dev
+stdout rsa1
+! stdout ec1
+exec azk key list --tag team
+stdout rsa1
+exec azk --json key list --prefix e
+stdout '"name": "ec1"'
+stdout '"name": "ed1"'
+! stdout rsa1
+
+# Export public PEM, private JWK, raw oct; import them back under new names.
+exec azk key export rsa1
+stdout 'BEGIN PUBLIC KEY'
+! stdout 'PRIVATE'
+exec azk key export rsa1 --reveal-private -o rsa1.pem
+grep 'BEGIN PRIVATE KEY' rsa1.pem
+exec azk key export ec1 --reveal-private --format jwk -o ec1.jwk
+grep '"kty": "EC"' ec1.jwk
+grep '"d":' ec1.jwk
+exec azk key export aes1 --reveal-private --format raw -o aes1.bin
+! exec azk key export aes1
+stderr 'no public part'
+! exec azk key export aes1 --reveal-private --format pem
+stderr 'no PEM representation'
+
+exec azk key import rsa2 --from rsa1.pem
+stdout 'Kind:     rsa'
+exec azk key import ec2 --from ec1.jwk
+stdout 'P-384'
+exec azk key import aes2 --from aes1.bin --format raw
+stdout '128'
+! exec azk key import bad --from aes1.bin
+stderr 'cannot detect key format'
+
+# Same key material yields the same thumbprint.
+exec azk --json key show rsa1
+cp stdout rsa1.json
+exec azk --json key show rsa2
+cp stdout rsa2.json
+exec sh -c 'grep thumbprint rsa1.json > t1; grep thumbprint rsa2.json > t2'
+cmp t1 t2
+
+# Public-only import.
+exec azk key export ec1 -o ec1.pub
+exec azk key import ecpub --from ec1.pub
+stdout 'public-only'
+! exec azk sign --key ecpub --in ec1.pub
+stderr 'only public material'
+
+# Rotation, enable/disable, tags.
+exec azk key rotate ec1 --disable-old
+stdout '  2 .* enabled'
+stdout '  1 .* disabled'
+exec azk key enable ec1 --version 1
+exec azk key show ec1
+stdout '  1 .* enabled'
+exec azk key disable ec1 --version 2
+! exec azk key disable ec1 --version 9
+stderr 'not found'
+exec azk key tag ec1 a=1 b=2
+exec azk key show ec1
+stdout 'Tags:     a=1,b=2'
+exec azk key tag ec1
+exec azk key show ec1
+stdout 'Tags:     -'
+
+# Soft delete, recover, purge.
+exec azk key delete ed1
+stderr 'Deleted ed1'
+exec azk key list
+! stdout ed1
+exec azk key list --deleted
+stdout 'ed1 +ed25519 +deleted'
+exec azk key list --all
+stdout ed1
+! exec azk key delete ed1
+stderr 'is deleted'
+! exec azk key purge rsa1
+stderr 'not deleted'
+exec azk key recover ed1
+! exec azk key recover ed1
+stderr 'not deleted'
+exec azk key delete ed1
+exec azk key purge ed1
+! exec azk key show ed1
+stderr 'not found'
+exec azk key purge rsa2 --force
+! exec azk key show rsa2
+
+exec azk audit tail -n 100
+stdout 'cli +key.generate +rsa1'
+stdout 'cli +key.export +rsa1 +.*"private":true'
+stdout 'cli +item.purge +ed1'

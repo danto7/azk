@@ -1,0 +1,30 @@
+exec azk init --label first
+exec azk key generate k --type ed25519
+exec azk slot list
+stdout 'passphrase +first'
+
+# Add a second passphrase, unlock with it, remove the first.
+exec azk slot add passphrase --label second --new-passphrase-file=new.txt
+stdout 'Added passphrase slot'
+exec azk --json slot list
+stdout '"label": "second"'
+! exec azk slot remove nope
+stderr 'not found'
+env AZK_PASSPHRASE=
+exec azk --passphrase-file=new.txt sign --key k --in new.txt
+exec azk --passphrase-file=new.txt slot remove first
+exec azk slot list
+! stdout first
+stdout second
+! exec azk --passphrase-file=old.txt sign --key k --in new.txt
+stderr 'does not unlock'
+! exec azk --passphrase-file=new.txt slot remove second
+stderr 'last slot'
+exec azk --passphrase-file=new.txt audit tail
+stdout 'slot.add'
+stdout 'slot.remove'
+
+-- new.txt --
+second passphrase
+-- old.txt --
+correct horse

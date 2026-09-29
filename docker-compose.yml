@@ -1,0 +1,10 @@
+# Local Azure emulator for development and manual testing.
+#   docker compose up -d
+#   azk remote add dev --vault-url http://localhost:4577/devstoreaccount1-keyvault --insecure-http
+services:
+  floci-az:
+    image: floci/floci-az:latest
+    ports:
+      - "4577:4577"
+    environment:
+      FLOCI_AZ_STORAGE_MODE: memory
